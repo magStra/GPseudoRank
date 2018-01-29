@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+src/main/resources/static/* linguist-vendored
+project-docs/* linguist-documentation
+*.rb linguist-language=Matlab
