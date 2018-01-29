@@ -66,7 +66,8 @@ permutationFileName = NaN;
 % 
 % Bioinformatics, 32(19):2973?2980, 2016.
 %%
-captureTimes     = [ones([1,6]),repmat(2,[1,6]),repmat(3,[1,6]),repmat(4,[1,6])];
+captureTimes = [ones([1,6]),repmat(2,[1,6]),repmat(3,[1,6]),...
+    repmat(4,[1,6])];
 %% 
 % There are two options for the spacing of the pseudotimes. If you set 'regInt 
 % = true', then they are equidistant, which is computationally more efficient, 
@@ -140,8 +141,10 @@ jj = NaN;%random value, we do not use this move
 tic
 parfor j=1:nChains
 tic
-feval(fHandle, fileName, j, nSamples, logPriorSDLength,verbose, initialise, thinningFreq, paramSamplingFreq,...
-    stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,burnInParams,n0,n3,n3a,jj,kk);
+feval(fHandle, fileName, j, nSamples, logPriorSDLength,verbose, ...
+    initialise, thinningFreq,paramSamplingFreq,stepSize,inputSeed,...
+    delta, pp,permuteData,captureTimes,regInt,...
+permutationFileName,burnInParams,n0,n3,n3a,jj,kk);
 toc
 end
 toc
@@ -180,7 +183,8 @@ distsL1a = zeros(nChains,nSamplesThinned);
 permuts1 = zeros(nSamplesThinned,24);%24 is the total number of time points
 
 for j = 1:nChains
-    orders1 = csvread(sprintf('WindramCellNames_Results_Orders_Chain%d.csv',j));
+    orders1 = ...
+        csvread(sprintf('WindramCellNames_Results_Orders_Chain%d.csv',j));
     permStart1 = csvread(sprintf('WindramCellNames_Permutation%d.csv',j));
    for k = 1:nSamplesThinned
         permuts1(k,:)  = permStart1(orders1(k,:));
@@ -289,10 +293,12 @@ nSamples         = 100000;
 % probability mass around the correct order and to avoid that a sampling or estimation 
 % algorithm gets trapped in local modes.
 %%
-priorLogSDLength = 0.01;%standard deviation of prior of log-length scale, recommended value
+priorLogSDLength = 0.01;%standard deviation of prior of log-length scale, 
+% recommended value
 paramSamplingFreq =10; %sampling parameters for every kth order
 verbose          = false; % Whether or not to print output to screen
-initialise       = true;  % If you have to stop the sampler, and then wish to rerun at a later date, set this to false 
+initialise       = true;  % If you have to stop the sampler, and then 
+% %wish to rerun at a later date, set this to false 
 thinningFreq     = 10;     % If set to X, records every X-th sample
 inputSeed        = NaN;  %use clock seed with chain-dependent offset
 %% 
@@ -315,7 +321,8 @@ permuteData      = true;
 %% 
 % The times at which the cells were captured:
 %%
-captureTimes     = [repmat(0,[1,49]),repmat(1,[1,75]),repmat(2,[1,65]),repmat(4,[1 60]),repmat(6,[1 58])];
+captureTimes = [repmat(0,[1,49]),repmat(1,[1,75]),repmat(2,[1,65]),...
+    repmat(4,[1 60]),repmat(6,[1 58])];
 %% 
 % With regInt = false, the pseudotime distances between cells are adapted 
 % to different speeds of biological development over the course of the reaction.
@@ -350,8 +357,10 @@ n0 = max(floor(307/4),1);
 %%
 tic
 parfor j = 1:nChains
-feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
-    stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
+feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose,...
+    initialise,thinningFreq, paramSamplingFreq,stepSize,inputSeed, ...
+    delta, pp,permuteData,captureTimes,regInt,permutationFileName,...
+    5000,n0,n3,n3a,jj,kk);
 end
 toc
 delete(gcp('nocreate'));
@@ -367,7 +376,8 @@ delete(gcp('nocreate'));
 burnIn = 5000;%number of thinned samples to be discarded as burn-in
 % 1:nChains refers to the identifieres of the MCMC chains and the initial
 % permutations, the output is saved in the file 'ShalekUncertA.mat'
-computePositionsPseudoRank('Shalek.csv',1:nChains,1:nChains,burnIn,captureTimes,'ShalekUncertA.mat');
+computePositionsPseudoRank('Shalek.csv',1:nChains,1:nChains,burnIn,...
+    captureTimes,'ShalekUncertA.mat');
 %% 
 % Plotting the posterior distributions of the cell positions: we see that 
 % the uncertainty decreases, once the reaction of the cells to the stimulant has 
@@ -417,7 +427,8 @@ csvwrite('ShalekDistFromRefL1Irreg.csv',distsL1a);
 % Now we illustrate the densities of the L1-distances using a histogram:
 %%
 figure();
-A = dlmread('ShalekDistFromRefL1Irreg.csv',',',[0 burnIn nChains-1 nSamplesThinned-1]);
+A = dlmread('ShalekDistFromRefL1Irreg.csv',',',...
+    [0 burnIn nChains-1 nSamplesThinned-1]);
 a = min([min(A)]);
 b = max([max(A)]);
 xlabel('$L^1$-distance','FontSize',10,'Interpreter','Latex');
@@ -471,13 +482,15 @@ csvwrite('LksShalek.csv',LksShalek);
 % the statistic below 1.1 is preferable, though 1.2 is considered sufficient in
 % 
 % SP Brooks and A Gelman. General methods for monitoring convergence of iterative 
-% simulations. _J Comput Graph Stat_, 7(4): 434?455, 1998. 
+% simulations. 
+% 
+% _J Comput Graph Stat_, 7(4): 434:455, 1998. 
 % 
 % 1.1 is recommended in 
 % 
 % A Gelman and K Shirley. Inference from simulations and monitoring convergence. 
 % In S Brooks, A Gelman, G Jones, and X-L Meng, editors, _Handbook of Markov Chain 
-% Monte Carlo_, volume 6, pages 163?174. CRC, Boca Raton, 2011. 
+% Monte Carlo_, volume 6, pages 163:174. CRC, Boca Raton, 2011. 
 %%
 A = importdata('GRShalek.csv');
 GRL1 = A.data;
