@@ -41,28 +41,31 @@ burnIn = 5000;%number of thinned samples to be discarded as burn-in
 set(0,'DefaultAxesFontName', 'Arial')
 set(0,'DefaultAxesFontSize', 8)
 set(0,'defaultfigurecolor',[1 1 1]);
-set(0, 'DefaultLineLineWidth', 1.2);
+set(0, 'DefaultLineLineWidth', 0.7);
 %for the plot, we colour the cells by their actually known capture times
-load('ShalekUncertB.mat')
 captureTimes = [repmat(1,[1,49]),repmat(2,[1,75]),repmat(3,[1,65]),repmat(4,[1 60]),repmat(5,[1 58])];
 %we use the true known capture times here, to identify them in the plot,
 %not for computation
+%convert positions to pseudotimes
+[x1, ~] = rankToPseudo('Shalek_Results_Orders_Chain1000.csv','Shalek.csv',...
+    'Shalek_Permutation1000.csv',5000,captureTimes);
+xx = mean(x1,1);
+yy = sqrt(var(x1));
 figure()
-a1=plot(xx(250:307,1),yy(250:307,1),'ko','MarkerSize',4);
+a1=plot(xx(250:307),yy(250:307),'ko','MarkerSize',4);
 hold on;
-a2=plot(xx(190:249,1),yy(190:249,1),'ro','MarkerSize',4);
+a2=plot(xx(190:249),yy(190:249),'ro','MarkerSize',4);
 hold on;
-a3=plot(xx(125:189,1),yy(125:189,1),'bo','MarkerSize',4);
+a3=plot(xx(125:189),yy(125:189),'bo','MarkerSize',4);
 hold on;
-a4=plot(xx(50:124,1),yy(50:124,1),'go','MarkerSize',4);
+a4=plot(xx(50:124),yy(50:124),'go','MarkerSize',4);
 hold on;
-a5=plot(xx(1:49,1),yy(1:49,1),'mo','MarkerSize',4);
-xlim([1,307]);
-ylim([4,40]);
+a5=plot(xx(1:49),yy(1:49),'mo','MarkerSize',4);
+xlim([0,1]);
 set(gca,'box','off');
 ax=gca;
-xlabel('posterior mean position','FontSize',10);
-ylabel('adjusted sd of position','FontSize',10);
+xlabel('mean pseudotime','FontSize',10);
+ylabel('sd of pseudotime','FontSize',10);
 leg=legend([a5,a4,a3,a2,a1],'0h', '1h', '2h', '4h','6h','Orientation','horizontal',...
     'Location','NorthOutSide');
 leg.FontSize = 8;
@@ -72,5 +75,5 @@ x_width = 8.8;
 y_width = 5;
 set(gcf, 'PaperPosition', [0 0 x_width y_width]);
  set(gcf,'PaperSize',[x_width y_width]);
-print('ShalekPosMeanSdB','-dpdf','-r350');
+print('ShalekPosMeanSdB','-dpdf','-r600');
 %
