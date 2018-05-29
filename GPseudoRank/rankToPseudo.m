@@ -34,6 +34,7 @@ for j = 1:m
     pseudoTimesA(j,:) = cumsum([0 tau1])/sum(tau1); 
     invPerm(permut(orders(j,:))) = 1:T;
     positions(j,:) = invPerm;
+    invPerm
     pseudoTimes(j,:)  = pseudoTimesA(j,invPerm);
 end
 end

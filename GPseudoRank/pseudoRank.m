@@ -86,6 +86,8 @@ if(~initialise)
     % Set up from the csv files
     B = csvread([saveFileNameOrder,'.csv'],0,0);
     currentOrder = B(end,:);
+    initPerm = csvread(permutationFileName);
+    data = data(:,initPerm);
     permData = data(:,currentOrder);
     if regularInt == false
         tau1 = sqrt(sum((diff(permData,1,2).^2),1));
@@ -100,7 +102,8 @@ if(~initialise)
     currentLogParams    = C(end,2:3)';
     nParamAcceptances   = C(end,4:5);
     nParamProposals     = C(end,6:7);
-    
+    logPriorGPParams = [log(sqrt(0.9*varData)),0.01; log(1/2), logPriorSDLength]; 
+
 else
     
     % Read in data (genenames, featurenames, and the data)
@@ -148,52 +151,18 @@ currentGPPrior   = [log(normpdf(currentLogParams(1),logPriorGPParams(1,1), logPr
     
 [X, Y] = meshgrid(pseudoTimes);
 timeDiffs               = (-(X - Y).^2);
-sparse = 0;
-%if the number of cells is larger than 350, we use sparse GPs
-if nFeatures > 350
-    sparse = 1;
-end
-if sparse == 1
-    lu      = ceil(nFeatures/10);
-    uu      = (0.5:1:(lu-0.5))/lu;
-    [X,Y]   = meshgrid(uu,uu);
-    timeDiffsU = -(X-Y).^2;
-end
 %initial log-likelihood
 currentSquaredParams = exp(2*currentLogParams);
 K           = currentSquaredParams(1)*exp(timeDiffs/(2*currentSquaredParams(2))) ...
     + (varData-currentSquaredParams(1))*eye(nFeatures);
 
 %compute the inverse and the determinant
-if sparse == 0
     KChol       = chol(K);
     opts.LT     = false;
     opts.UT     = true;
     X           = linsolve(KChol,eye(nFeatures),opts);
     KInv        = X*X';
     logDetK     =  2*(sum(log(diag(KChol))));
-else
-     K_uu = sf2*exp(timeDiffsU/(2*l2));
-     clear opts;
-     opts.UT = true;
-     K_uuCholInv     = linsolve(chol(K_uu+0.0001*eye(length(uu))),eye(length(uu)),opts);
-    [U,T]              = meshgrid(pseudoTimes,uu);
-    tu                 = -(U-T).^2;
-    K_u_tau            = sf2*exp(tu/(2*l2));
-    A_ut               = K_uuCholInv'* K_u_tau;
-    Q                  = A_ut'*A_ut;
-    lambda             = diag(K - Q) + repmat(se2,length(tau1),1);
-    LambdaInv          = diag(lambda.^-1);
-    B                  = A_ut*LambdaInv;
-    C                  = eye(length(uu)) + B*A_ut';
-    cholC              = chol(C);
-    clear opts;
-    opts.LT = true;
-    cholY              = linsolve(cholC',B,opts);
-    Y                  = cholY'*cholY;
-    KInv               = LambdaInv - Y;
-    logDetK            =  sum(log(lambda))+2*sum(log(diag(cholC)));
-end
  abc = 0;
     for i = 1:nGenes
         abc = abc + permData(i,:)*KInv*permData(i,:)';
@@ -202,8 +171,7 @@ end
  currentLogMarginalLikelihood = -0.5*(N*log(2*pi)+logDetK+abc);
 
 %compute the probabilities of choosing moves
-distanceMatrix1             = bsxfun(@minus,data,permute(data,[1 3 2]));
-distanceMatrix              = sum(reshape(abs(distanceMatrix1),size(data,1),[]));
+distanceMatrix              = computeDistMat(data);
 moveProbs = zeros(nFeatures^2,3);
 moveProb1                = exp(-delta(1)* distanceMatrix.^2);
 moveProb1                = moveProb1./sum(moveProb1);

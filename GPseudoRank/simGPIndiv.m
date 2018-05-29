@@ -34,13 +34,10 @@ else%regular pseudotime points
 end
 [X,Y] = meshgrid(tau,tau);
 lw = length(sw2);
-K = zeros(T,T,lw);
-for j = 1:lw
-    K(:,:,j) = sw2(j) * exp(-(X-Y).^2/l(j)) + se2(j)*eye(T);
-end
 simData = zeros(lw,T);
 for j = 1:lw
-    simData(j,:) = mvnrnd(zeros([1 T]),K(:,:,j),1);
+    K = sw2(j) * exp(-(X-Y).^2/l(j)) + se2(j)*eye(T);
+    simData(j,:) = mvnrnd(zeros([1 T]),K,1);
 end
 csvwrite(simDataFileName,simData);
 csvwrite(tauFileName,tau);

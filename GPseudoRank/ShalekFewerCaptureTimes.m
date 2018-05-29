@@ -24,13 +24,17 @@ n0 = max(floor(307/4),1);
         n3a = max(3,floor(307/12));
         kk = 1;
         jj = 1;
-tic
+
 %uncomment to run the MCMC sampler
 %feval(fHandle, 'Shalek.csv', 1000, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
  %   stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
 
+tic
+nSamples = 50000;
+feval(fHandle, 'Shalek.csv', 111, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
+    stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
 toc
-delete(gcp('nocreate'));
+%Elapsed time is 254.386482 seconds.
 %compute the cell position frequencies
 burnIn = 5000;%number of thinned samples to be discarded as burn-in
 %Run the following lines only after running the MCMC sampler.

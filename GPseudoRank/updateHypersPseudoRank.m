@@ -1,6 +1,6 @@
 function [newLogLik newLogPriorOfLogHypers newLogHypers newSquaredHypers accepted newKInv newLogDet] = ...
     updateHypersPseudoRank(proposedLogHypers,currentSquaredHypers, timeDiffs,permData,logLik,...
-    logPriorOfLogHypers,hyperPriorParams, nTimes, nGenes,varData,sparse)
+    logPriorOfLogHypers,hyperPriorParams, nTimes, nGenes,varData)
 N = nGenes*nTimes;
 newKInv = NaN;
 newLogDet = NaN;
