@@ -6,9 +6,7 @@
 % and regulation deciphered by high-resolution temporal transcriptomic analysis.  
 % _The Plant Cell_, 2012.
 % 
-% The following code runs 4 MCMC chains. The plots will therefore not be 
-% fully identical to those in the GPseudoRank paper, where we ran 12 chains for 
-% a more detailed and exact convergence analysis. 
+% The following code runs 4 MCMC chains. 
 % 
 % The number of chains and the function we run:
 
