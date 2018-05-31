@@ -1,13 +1,13 @@
 %This script repeates the inference on the Shalek data, pretending not to
 %be able to distiguish the first and second capture times, to test the
 %GPseudoRank method further.
-maxNumCompThreads = 12;
+
 fHandle          = @pseudoRank; 
 fileName         = 'Shalek.csv';
-nSamples         = 500000;  
+nSamples         = 100000;  
 priorLogSDLength = 0.01;%standard deviation of prior of log-length scale, recommended value
 paramSamplingFreq =10; %sampling parameters for every kth order
-verbose          = false; % Whether or not to print output to screen
+verbose          = true; % Whether or not to print output to screen
 initialise       = true;  % If you have to stop the sampler, and then wish to rerun at a later date, set this to false 
 thinningFreq     = 10;     % If set to X, records every X-th sample
 inputSeed        = NaN;  %use clock seed with chain-dependent offset
@@ -26,15 +26,11 @@ n0 = max(floor(307/4),1);
         jj = 1;
 
 %uncomment to run the MCMC sampler
-%feval(fHandle, 'Shalek.csv', 1000, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
- %   stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
-
 tic
-nSamples = 50000;
-feval(fHandle, 'Shalek.csv', 111, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
-    stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
+feval(fHandle, 'Shalek.csv', 1000, nSamples, priorLogSDLength, verbose, initialise, thinningFreq, paramSamplingFreq,...
+   stepSize,inputSeed, delta, pp,permuteData,captureTimes,regInt,permutationFileName,5000,n0,n3,n3a,jj,kk);
 toc
-%Elapsed time is 254.386482 seconds.
+fflush(stdout)
 %compute the cell position frequencies
 burnIn = 5000;%number of thinned samples to be discarded as burn-in
 %Run the following lines only after running the MCMC sampler.

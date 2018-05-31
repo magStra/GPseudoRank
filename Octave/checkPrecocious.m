@@ -10,9 +10,9 @@ set(0,'DefaultAxesFontName', 'Arial')
 set(0,'DefaultAxesFontSize', 8)
 set(0,'defaultfigurecolor',[1 1 1]);
 figure();
-bar(1:307,posFreq(91,:,1),'FaceAlpha',0.6,'FaceColor','g')
+bar(1:307,posFreq(91,:,1),'FaceColor','g')
 hold on;
-bar(1:307,posFreq(92,:,1),'FaceAlpha',0.6,'FaceColor','b')
+bar(1:307,posFreq(92,:,1),'FaceColor','b')
 hold on;
 a=ylim;
 h1 = line([125,125],[0,a(2)]);

@@ -61,11 +61,13 @@ if(isnan(inputSeed))
     inputSeed = sum(100*clock) + sum(100*double(uniqueIdentifier)); %%clock-seed the random number generator (with a chain-depenedent offset)
 end
 
-rng(inputSeed);
+randn("seed",inputSeed)
+rand("seed",inputSeed)
 
 saveFileNameOrder = [strtok(fileName, '.'),'_Results_Orders_Chain', num2str(uniqueIdentifier)];
 saveFileName      = [strtok(fileName, '.'),'_Results_Chain', num2str(uniqueIdentifier)];
 %Lk, parameters, acceptance rates
+fileName
 allData = importdata(fileName, ',');
 try
     data    = allData.data;
@@ -213,6 +215,7 @@ nMcmc = nSamples;
             disp(['Order acceptance rate = ', num2str(oAR)]);
             disp(['Parameter acceptance rate = ', num2str(nParamAcceptances./nParamProposals)]);
             disp(['Parameters: ', num2str([currentSquaredParams(1),sqrt(currentSquaredParams(2))])]);
+            fflush(stdout);
     end    
     
 % %sample the parameters

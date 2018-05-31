@@ -6,13 +6,14 @@
 % and regulation deciphered by high-resolution temporal transcriptomic analysis.  
 % _The Plant Cell_, 2012.
 % 
-% The following code runs 4 MCMC chains. The plots will therefore not be 
-% fully identical to those in the GPseudoRank paper, where we ran 12 chains for 
+% The following code runs 4 MCMC chains. 
 % a more detailed and exact convergence analysis. 
 % 
 % The number of chains and the function we run:
 
 clear all;
+pkg load statistics%loading the statistics package
+pkg load parallel
 nChains          = 4;
 fHandle          = @pseudoRank;
 %% 
@@ -25,7 +26,7 @@ fileName         = 'WindramCellNames.csv';
 % Each of the 4 chains is assigned an identifier for post-processing.
 %%
 uniqueIdentifier = 1:nChains;
-nSamples         = 100000;%as in GPseudoRank paper
+nSamples         = 50000;
 %% 
 % Standard deviation for the informative prior on the log-lenth scale.
 %%
@@ -38,7 +39,7 @@ paramSamplingFreq =10;
 %% 
 % We do not print the output on the screen during the sampling.
 %%
-verbose          = false;
+verbose          = true;
 %% 
 % We start a new chain.
 %%
@@ -86,49 +87,7 @@ regInt           = false; %fixed recommended setting
 %%
 burnInParams     = 5000; %fixed recommended setting
 stepSize         = [0.01,0.01]; %fixed recommended setting
-%% Description of the proposal moves for the orders
-% * *Move 1, iterated swapping of neighbouring cells:* draw the number r of 
-% swaps uniformy from 1: n0 and then draw r swap positions from 1: (T-1), where 
-% T is the number of cells. Then for j = 1: r iterate the following: swap the 
-% cell at the selected swap position with its neighbour. 
-% * *Move 2, swapping of cells with short L1-distances:* select two positions 
-% i and j proportional to probability $p_{ij} \propto \exp(-{d(c_i,c_j)^2}{\delta_1})$, 
-% where d refers to the L1 distances of cells $c_i$ and $c_j$ in these positions. 
-% Move $c_i$ to position j and $c_j$ to position i.
-% * *Move 3, reversals:* obtain two positions i and j as in move 2 (replacing  
-% $\delta_1$ by $\delta_2$) and reverse the ordering of all cells in between, 
-% including cells at i and j. 
-% * *Move 4, short random permutations: *draw a number r_2 of short permutations 
-% uniformly from 1, ... n3. For each j = 1, ... , r_2, draw a number r_3j uniformly 
-% from 3, ... ,max(n3a,3)) and a cell position k_j uniformly from 1, ... ,T - 
-% r_3j. Randomly permute the cells at positions k_j, ..., k_j + r_3j.
-% * *Move 5, reversing the entire ordering*
-% 
-% The rationale for moves 2 and 3 is that two cells which are positioned 
-% apart in the ordering should only be exchanged (move 2) or the segment between 
-% them reversed (move 3) if these cells have similar expression profiles and the 
-% smoothness of the trajectory remains intact after the move. 
-% 
-% The distributions for choosing moves 2 and 3 may be tempered, that is taken 
-% to the power of jj and kk, respectively, to lower acceptance rates if required. 
-% 
-% As applying two point estimation methods for single-cell orders (SLICER 
-% and TSCAN) leads to two very different estimates for the order, we understand 
-% that the distribution has more than one mode, in which case move 3 is the best 
-% choice. Alternatively, if we do not have this additional information, we may 
-% run some of the chains using move 3, and some chains using a combination of 
-% all moves. In case of several modes, move 3 will typically perform best, but 
-% for distributions of noisy data with only one mode, a combination of all moves 
-% was shown to converge faster in our extensive simulation study. 
-% 
-% J D Welch, A J Hartemink, and J F Prins. SLICER: inferring branched, nonlinear 
-% cellular trajectories from single cell RNA-seq data. _Genome Biol_, 17(1):106, 
-% 2016. 
-% 
-% Z Ji and H Ji. TSCAN: Pseudo-time reconstruction and evaluation in single- 
-% cell RNA-seq analysis. _Nucleic Acids Res_, 44(13):e117?e117, 2016. 
-%%
-pp               = [0 0 1 0 0]; %only move 3, fixed recommended setting
+pp               = [0 0 1 0 0]; %only move 3, samples this data set best
 delta            = [NaN,1/1000]; % delta_2 for move 3
 
 kk = 0.1;% tempering the distribution for proposal move 3
@@ -138,8 +97,7 @@ n3 = NaN;%random value, we do not use this move
 n3a = NaN;%random value, we do not use this move
 jj = NaN;%random value, we do not use this move
 
-tic
-parfor j=1:nChains
+or j=1:nChains
 tic
 feval(fHandle, fileName, j, nSamples, logPriorSDLength,verbose, ...
     initialise, thinningFreq,paramSamplingFreq,stepSize,inputSeed,...
@@ -148,8 +106,7 @@ permutationFileName,burnInParams,n0,n3,n3a,jj,kk);
 toc
 end
 toc
-poolobj = gcp('nocreate');
-delete(poolobj);
+fflush(stdout)
 %% 
 % 
 %% Postprocessing:
@@ -196,14 +153,6 @@ for j = 1:nChains
 end
 csvwrite('WindramDists.csv',distsL1a);
 %% 
-% Plotting the histogram:
-%%
-figure();
-histogram(distsL1a,'FaceAlpha',0.3,'BinWidth',2);
-set(gca,'box','off');
-ax=gca;
-ax.FontSize = 10;
-xlabel('$L^1$-distance','FontSize',12,'Interpreter','Latex');
 %% Convergence analysis
 % We compute the Gelman-Rubin statistic for the log-likelihoods rather than 
 % the L1-distances, because of the bimodality of the L1-distances.
@@ -223,21 +172,20 @@ csvwrite('LksWindram.csv',LksWindram);
 % Run the following code in R to compute the Gelman-Rubin statistic, using 
 % the coda package:
 % 
-% |library(coda) |
-% 
-% x1 = read.csv("LksWindram.csv",header = F) 
-% 
-% x1MC = as.mcmc.list(lapply(as.data.frame((x1)), mcmc)) 
-% 
-% XX1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
-% 
-% write.csv(XX1$shrink[,,1],"GRWindram_Lks.csv")
+% library(coda) 
+ 
+%x1 = read.csv("LksWindram.csv",header = F) 
+
+%x1MC = as.mcmc.list(lapply(as.data.frame((x1)), mcmc)) 
+%XX1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
+%write.table(cbind(XX1$last.iter,XX1$shrink[,1,1]),col.names = F,row.names = F,"GRWindram_Lks.csv",sep=",")
+
 % 
 % Now we can plot the Gelman-Rubin statistics:
 %%
-A = importdata('GRWindram_Lks.csv');
-GRLk = A.data;
-stepSize =  cellfun(@str2num,A.textdata(2:end,1));
+A = importdata('GRWindram_Lks.csv',',');
+GRLk = A(:,2);
+stepSize = A(:,1);
 figure();
 plot(stepSize,GRLk,'LineWidth',2);
 hold on;
@@ -281,6 +229,7 @@ leg.FontSize = 11;
 % the convergence analysis at the end of this demonstration). 
 %%
 clear all;
+close all;
 nChains = 4;% 12 for detailed convergence analysis; 1 sufficient for general 
 % use
 %%
@@ -296,7 +245,7 @@ nSamples         = 100000;
 priorLogSDLength = 0.01;%standard deviation of prior of log-length scale, 
 % recommended value
 paramSamplingFreq =10; %sampling parameters for every kth order
-verbose          = false; % Whether or not to print output to screen
+verbose          = true; % Whether or not to print output to screen
 initialise       = true;  % If you have to stop the sampler, and then 
 % %wish to rerun at a later date, set this to false 
 thinningFreq     = 10;     % If set to X, records every X-th sample
@@ -356,14 +305,14 @@ n0 = max(floor(307/4),1);
 % using the output files provided. 
 %%
 tic
-parfor j = 1:nChains
+for j = 1:nChains
 feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose,...
     initialise,thinningFreq, paramSamplingFreq,stepSize,inputSeed, ...
     delta, pp,permuteData,captureTimes,regInt,permutationFileName,...
     5000,n0,n3,n3a,jj,kk);
 end
 toc
-delete(gcp('nocreate'));
+
 %% Uncertainty of cell positions
 % The uncertainty of the cell positions changes over the course of the response 
 % to the infection.
@@ -423,18 +372,6 @@ for j = 1:nChains
     distsL1a(j,:) = distFromRefOrder(permuts1,1:307);
 end
 csvwrite('ShalekDistFromRefL1Irreg.csv',distsL1a);
-%% 
-% Now we illustrate the densities of the L1-distances using a histogram:
-%%
-figure();
-A = dlmread('ShalekDistFromRefL1Irreg.csv',',',...
-    [0 burnIn nChains-1 nSamplesThinned-1]);
-a = min([min(A)]);
-b = max([max(A)]);
-xlabel('$L^1$-distance','FontSize',10,'Interpreter','Latex');
-set(gcf, 'PaperUnits', 'centimeters');
-histogram(A(:),'BinEdges', a:30:b,'FaceAlpha',0.3);
-set(gca,'box','off');
 %% Convergence analysis
 % First we compute the Gelman-Rubin Rhat statistic for the L1-distances of the 
 % sampled cell positions from the reference permutation 1:307.
@@ -468,7 +405,7 @@ csvwrite('LksShalek.csv',LksShalek);
 % Run the following code in R to compute the Gelman-Rubin statistic, using 
 % the coda package:
 % 
-% |library(coda) |
+% library(coda) 
 % 
 % x1 = read.csv("LksShalek.csv",header = F) 
 % 
@@ -476,7 +413,7 @@ csvwrite('LksShalek.csv',LksShalek);
 % 
 % XX1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
 % 
-% write.csv(XX1$shrink[,,1],"GRShalek_Lks.csv")
+% write.table(cbind(XX1$last.iter,XX1$shrink[,1,1]),col.names = F,row.names = F,"GRShalek_Lks.csv",sep=",")
 % 
 % Now we can plot the Gelman-Rubin statistics. For convergence, a value for 
 % the statistic below 1.1 is preferable, though 1.2 is considered sufficient in
@@ -492,13 +429,10 @@ csvwrite('LksShalek.csv',LksShalek);
 % In S Brooks, A Gelman, G Jones, and X-L Meng, editors, _Handbook of Markov Chain 
 % Monte Carlo_, volume 6, pages 163:174. CRC, Boca Raton, 2011. 
 %%
-A = importdata('GRShalek.csv');
-GRL1 = A.data;
-GRLk = csvread('GRShalek_Lks.csv',1,1);
-stepSize =  cellfun(@str2num,A.textdata(2:end,1));
+A = importdata('GRWindram_Lks.csv',',');
+GRLk = A(:,2);
+stepSize = A(:,1);
 figure();
-plot(stepSize,GRL1,'LineWidth',2);
-hold on;
 plot(stepSize,GRLk,'LineWidth',2);
 hold on;
 h0 = refline([0,1.2]);
@@ -509,10 +443,14 @@ h1 = refline([0,1.1]);
 h1.LineWidth = 2;
 h1.Color = 'g';
 h1.LineStyle = '--';
+h2 = refline([0,1.05]);
+h2.LineWidth = 2;
+h2.Color = 'r';
+h2.LineStyle = '--';
 ylim([1,1.7]);
 xlabel('sample(thinning = 10)','FontSize',10);
 ylabel('$\hat{R}$','Interpreter','Latex','FontSize',10);
 set(gca,'box','off');
 ax=gca;
-leg = legend('L^1-distances','log-Lk','1.2-level','1.1-level');
+leg = legend([h0,h1,h2],'1.2-level','1.1-level','1.05-level');
 leg.FontSize = 11;

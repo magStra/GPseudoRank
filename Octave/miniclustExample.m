@@ -6,9 +6,9 @@ l = exp(logL);
 logSe2 = randn(1,100)*0.1 + log(sqrt(0.5));
 se2 = exp(2*logSe2);
 ppar = [logSw2;logL;logSe2];
-simGPIndiv(5000,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
+simGPIndiv(2000,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
 %assuming there are capture times
-captureTimes = [zeros(1,1000),ones(1,1000),repmat(2,1,1000),repmat(3,1,1000),repmat(4,1,1000)];
+captureTimes = [zeros(1,500),ones(1,500),repmat(2,1,500),repmat(3,1,500)];
 miniclust('sim_Example1.csv',captureTimes);
 
 %now find default parameters
