@@ -1,235 +1,19 @@
 %% GPseudoRank by example
-%% Example 1: Microarray data set
-% We apply GPseudoRank to the following data set:
-% 
-% Windram et al. Arabidopsis defense against botrytis cinerea: chronology 
-% and regulation deciphered by high-resolution temporal transcriptomic analysis.  
-% _The Plant Cell_, 2012.
-% 
-% The following code runs 4 MCMC chains. 
-% a more detailed and exact convergence analysis. 
-% 
-% The number of chains and the function we run:
-
-clear all;
-pkg load statistics%loading the statistics package
-pkg load parallel
-nChains          = 4;
-fHandle          = @pseudoRank;
-%% 
-% As a function input, we need to provide the name of the .csv file containing 
-% the expression data (genes along the rows, and cells along the columns). The 
-% file may contain an additional intial row and column of text. 
-%%
-fileName         = 'WindramCellNames.csv';
-%% 
-% Each of the 4 chains is assigned an identifier for post-processing.
-%%
-uniqueIdentifier = 1:nChains;
-nSamples         = 50000;
-%% 
-% Standard deviation for the informative prior on the log-lenth scale.
-%%
-logPriorSDLength = 0.1; %fixed recommended setting
-%% 
-% We sample the GP parameters at every 10th iteration of the sampling of 
-% the orders:
-%%
-paramSamplingFreq =10;
-%% 
-% We do not print the output on the screen during the sampling.
-%%
-verbose          = true;
-%% 
-% We start a new chain.
-%%
-initialise       = true;
-%% 
-% We record every 10th sample.
-%%
-thinningFreq     = 10;
-%% 
-% We do not use a fixed input seed, but clock-seed the random number generator 
-% with a chain-dependent offset. 
-%%
-inputSeed        = NaN;
-%% 
-% We use a random initial order. If you want to start from a given order 
-% specified in a csv-file, set permutationFileName accordingly. 
-%%
-permuteData         = true;
-permutationFileName = NaN;
-%% 
-% We assume the same capture times as in the DeLorean pseudotime paper.
-% 
-% J E Reid and L Wernisch._ Pseudotime estimation: deconfounding single cell 
-% time series_. 
-% 
-% Bioinformatics, 32(19):2973?2980, 2016.
-%%
-captureTimes = [ones([1,6]),repmat(2,[1,6]),repmat(3,[1,6]),...
-    repmat(4,[1,6])];
-%% 
-% There are two options for the spacing of the pseudotimes. If you set 'regInt 
-% = true', then they are equidistant, which is computationally more efficient, 
-% but does not account for the fact that the speed of biological development changes 
-% during the course of that development. With regInt set to 'false', GPseudoRank 
-% approximates pseudotime distances like geodesic distances on a manifold as sums 
-% of local Euclidean distances. Using regular pseudotimes when this is not justified 
-% may change the shape of the posterior distribution considerably, and the sampler 
-% may also fail to capture multi-modality. 
-%%
-regInt           = false; %fixed recommended setting
-%% 
-% The proposal distribution for the Gaussian process parameters is adapted 
-% during the first iterations of the sampler, up to burnInParams. 'stepSize' is 
-% the initial step size for the proposal, which is then adapted. 
-%%
-burnInParams     = 5000; %fixed recommended setting
-stepSize         = [0.01,0.01]; %fixed recommended setting
-pp               = [0 0 1 0 0]; %only move 3, samples this data set best
-delta            = [NaN,1/1000]; % delta_2 for move 3
-
-kk = 0.1;% tempering the distribution for proposal move 3
-
-n0 = NaN;%random value, we do not use this move
-n3 = NaN;%random value, we do not use this move
-n3a = NaN;%random value, we do not use this move
-jj = NaN;%random value, we do not use this move
-
-or j=1:nChains
-tic
-feval(fHandle, fileName, j, nSamples, logPriorSDLength,verbose, ...
-    initialise, thinningFreq,paramSamplingFreq,stepSize,inputSeed,...
-    delta, pp,permuteData,captureTimes,regInt,...
-permutationFileName,burnInParams,n0,n3,n3a,jj,kk);
-toc
-end
-toc
-fflush(stdout)
-%% 
-% 
-%% Postprocessing:
-% We plot the posterior distribution of the cell positions, using the first 
-% chain.
-% 
-% This first requires computing the posterior distribution of the cell positions:
-%%
-computePositionsPseudoRank('WindramCellNames.csv',1,1,1800,...
-[repmat(1,[1,6]),repmat(2,[1,6]),repmat(3,[1,6]),repmat(4,[1,6])],...
-'WindramUncert.mat');%1 is the identifier of the chain, we discard the first
-%1800 thinned samples as burn-in
-%% 
-% Plotting the marginal posterior distributions of the cell positions:
-%%
-load('WindramUncert.mat');
-figure()
-imagesc(posFreq');
-xlabel('true position','FontSize',12);
-ylabel('estimated position','FontSize',12);
-set(gca,'YDir','normal')
-colorbar;
-%% 
-% Computing and plotting the distribution of the distances of the orders 
-% from the true order, illustrating the bimodality of the distribution.
-% 
-% Computation:
-%%
-nSamplesThinned = floor(nSamples/thinningFreq);
-distsL1a = zeros(nChains,nSamplesThinned);
-permuts1 = zeros(nSamplesThinned,24);%24 is the total number of time points
-
-for j = 1:nChains
-    orders1 = ...
-        csvread(sprintf('WindramCellNames_Results_Orders_Chain%d.csv',j));
-    permStart1 = csvread(sprintf('WindramCellNames_Permutation%d.csv',j));
-   for k = 1:nSamplesThinned
-        permuts1(k,:)  = permStart1(orders1(k,:));
-    end
-  
-    corrCap1 = corr(permuts1',captureTimes');
-    permuts1(corrCap1<0,:) = permuts1(corrCap1<0,end:-1:1);
-    distsL1a(j,:) = distFromRefOrder(permuts1,1:24);
-end
-csvwrite('WindramDists.csv',distsL1a);
-%% 
-%% Convergence analysis
-% We compute the Gelman-Rubin statistic for the log-likelihoods rather than 
-% the L1-distances, because of the bimodality of the L1-distances.
-% 
-% First combine the log-likelihoods of the individual chains in a single 
-% file:
-%%
-nThinnedSamples = floor(nSamples/thinningFreq)
-LksWindram = [];
-for j = 1:nChains
-File = sprintf('WindramCellNames_Results_Chain%d.csv',j);  
- xx = dlmread(File,',',[0 0 nThinnedSamples-1 0]);
- LksWindram = [LksWindram xx];
-end
-csvwrite('LksWindram.csv',LksWindram);
-%% 
-% Run the following code in R to compute the Gelman-Rubin statistic, using 
-% the coda package:
-% 
-% library(coda) 
- 
-%x1 = read.csv("LksWindram.csv",header = F) 
-
-%x1MC = as.mcmc.list(lapply(as.data.frame((x1)), mcmc)) 
-%XX1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
-%write.table(cbind(XX1$last.iter,XX1$shrink[,1,1]),col.names = F,row.names = F,"GRWindram_Lks.csv",sep=",")
-
-% 
-% Now we can plot the Gelman-Rubin statistics:
-%%
-A = importdata('GRWindram_Lks.csv',',');
-GRLk = A(:,2);
-stepSize = A(:,1);
-figure();
-plot(stepSize,GRLk,'LineWidth',2);
-hold on;
-h0 = refline([0,1.2]);
-h0.LineWidth = 2;
-h0.Color = 'c';
-h0.LineStyle = '--';
-h1 = refline([0,1.1]);
-h1.LineWidth = 2;
-h1.Color = 'g';
-h1.LineStyle = '--';
-h2 = refline([0,1.05]);
-h2.LineWidth = 2;
-h2.Color = 'r';
-h2.LineStyle = '--';
-ylim([1,1.7]);
-xlabel('sample(thinning = 10)','FontSize',10);
-ylabel('$\hat{R}$','Interpreter','Latex','FontSize',10);
-set(gca,'box','off');
-ax=gca;
-leg = legend([h0,h1,h2],'1.2-level','1.1-level','1.05-level');
-leg.FontSize = 11;
-%% Example 2: scRNA-seq data set
-% We apply GPseudoRank to an scRNA-seq data set from 
-% 
-% Shalek et al. Single-cell RNA-seq reveals dynamic paracrine control of 
-% cellular variation Nature, 2104. 
-% 
-% Logarithms of expression levels were adjusted for cell size using the method 
-% introduced by 
-% 
-% S Anders and W Huber. Differential expression analysis for sequence count 
-% data. _Genome Biol_, 11(10):R106?R106, 2010. 
-% 
-% Exact replication of the study conducted in the paper requires 12 parallel 
-% chains. The larger number of parallel chains allows more exact convergence analysis, 
-% but for general use 1 chain is sufficient. To allow any assessment of convergence 
-% using the Gelman-Rubin statistic, at least 3-4 chains are required. We use fewer 
-% iterations than in the full analysis in the GPseudoRank paper, but a sufficient 
-% number to ensure convergence according to the Gelman-Rubin statistic (see also 
-% the convergence analysis at the end of this demonstration). 
-%%
+% This vignette provides examples on
+%
+% 1)  how to sample distributions of orders with GPseudoRank, and how to
+% check convergence (example 1).
+%
+% 2) how to preprocess a larger data set using the mini-cluster approximation
+% and how to use the setDefaultParams function (example 2).
+%
+% 3) how to select genes for pseudotime ordering (example 3).
+%
+%
+%% Example 1: Application to medium-sized scRNA-seq data set without mini-cluster approximation
 clear all;
 close all;
+pkg load statistics
 nChains = 4;% 12 for detailed convergence analysis; 1 sufficient for general 
 % use
 %%
@@ -454,3 +238,52 @@ set(gca,'box','off');
 ax=gca;
 leg = legend([h0,h1,h2],'1.2-level','1.1-level','1.05-level');
 leg.FontSize = 11;
+
+%% Example 2: mini-cluster approximation and default parameter settings for the proposal moves
+% Simulating a data set with 5000 cells
+%%
+logSw2 = randn(1,100)*0.1 + log(sqrt(1));
+sw2 = exp(2*logSw2);
+logL = randn(1,100).*0.1+log(0.4);
+l = exp(logL);
+logSe2 = randn(1,100)*0.1 + log(sqrt(0.5));
+se2 = exp(2*logSe2);
+ppar = [logSw2;logL;logSe2];
+simGPIndiv(5000,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
+%% 
+% Applying the mini-cluster approximation
+%%
+%assuming there are capture times
+captureTimes = [zeros(1,1000),ones(1,1000),repmat(2,1,1000),repmat(3,1,1000),repmat(4,1,1000)];
+miniclust('sim_Example1.csv',captureTimes);
+%% 
+% Finding the default parameters for this data set:
+%%
+[n0,n3,n3a,jj,kk,delta,pp]  = setDefaultParams('sim_Example1KM.csv',true);
+%%
+delete -r 'sim_Example1*'
+%% Example 3: selecting genes
+% Simulating a data set with 5000 genes
+%%
+logSw2 = randn(1,5000)*0.1 + log(sqrt(1));
+sw2 = exp(2*logSw2);
+logL = randn(1,5000).*0.1+log(0.4);
+l = exp(logL);
+logSe2 = randn(1,5000)*0.1 + log(sqrt(0.5));
+se2 = exp(2*logSe2);
+ppar = [logSw2;logL;logSe2];
+simGPIndiv(60,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
+%% 
+% Selecting genes with capture times using anova to test difference between 
+% mean expressions for different capture times
+%%
+captureTimes = [zeros(1,20),ones(1,20),repmat(2,1,20)];
+selGenes('sim_Example1.csv',captureTimes);
+%% 
+% Selecting genes without capture times
+%%
+captureTimes = [zeros(1,20),ones(1,20),repmat(2,1,20)];
+selGenes('sim_Example1.csv');
+%%
+delete 'sim_Example1*'
+        

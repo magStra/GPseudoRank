@@ -13,7 +13,7 @@ end
 if nargin == 2
     captureTimes = varargin{1};
     for j = 1:size(data,1)
-    p(j) = anova1(data(j,:),captureTimes,'off');
+    p(j) = anova(data(j,:),captureTimes);
     end
     [x inds] = sort(p);
     nGenes = size(data,1);
@@ -21,10 +21,13 @@ if nargin == 2
     genesRed = inds(inds(1:min(floor(nGenes*0.8),100)));
 else %if there are no capture times
     inds3 = [];
-    for jk = 1:size(data,1)
-        inds3 = [inds3;sum(data(jk,:)~=0)>101*0.7];
+    [nGenes,nCells] = size(data);
+    for jk = 1:nGenes
+        if sum(data(jk,:)~=0)>nCells*0.7
+            inds3 = [inds3;jk];%reduce if needed
+        end
     end
-    xx = 1:size(data,1);
+    xx = 1:nGenes;
     all1 = data(inds3,:);
     xx = xx(inds3);
     nGenes = size(all1,1);
