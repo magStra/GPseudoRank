@@ -5,7 +5,6 @@ function [distVecL1] = distFromRefOrder(orders,refOrder)
 distVecL1 = zeros(n,1);
 distVecSpearman = zeros(n,1);
 for j = 1:n
-    j
     A = orders(j,:);
     pos1(A) = 1:T;
    distVecL1(j) = pdist([pos1;refOrder],'cityblock');

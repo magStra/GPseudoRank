@@ -9,7 +9,6 @@ function meanPermutMatrix = convertToMatrix(permuts)
 I(permuts(:,1)) = 1:lp;
 meanPermutMatrix = zeros(lp,lp);
 permutMatrix = zeros(lp,lp);
-permuts(:,1)
 meanPermutMatrix(:,I) = eye(lp);
 
 for j = 2:np

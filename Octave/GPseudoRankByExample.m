@@ -1,8 +1,7 @@
 %% GPseudoRank by example
 % This vignette provides examples on
 %
-% 1)  how to sample distributions of orders with GPseudoRank, and how to
-% check convergence (example 1).
+% 1)  how to sample distributions of orders with GPseudoRank.
 %
 % 2) how to preprocess a larger data set using the mini-cluster approximation
 % and how to use the setDefaultParams function (example 2).
@@ -13,14 +12,15 @@
 %% Example 1: Application to medium-sized scRNA-seq data set without mini-cluster approximation
 clear all;
 close all;
+graphics_toolkit gnuplot
 pkg load statistics
-nChains = 4;% 12 for detailed convergence analysis; 1 sufficient for general 
+nChains = 1;% 12 are ideal for detailed convergence analysis; 1 sufficient for general 
 % use
 %%
 fHandle          = @pseudoRank; 
 fileName         = 'Shalek.csv';
 %%
-nSamples         = 100000;
+nSamples         = 70000;
 %% 
 % Informative priors of the model are necessary to ensure it concentrates 
 % probability mass around the correct order and to avoid that a sampling or estimation 
@@ -82,19 +82,13 @@ n0 = max(floor(307/4),1);
         n3a = max(3,floor(307/12));
         kk = 1;
         jj = 1;
-%% 
-% Running nChains MCMC chains in parallel with different random starting 
-% paths. This takes a bit of time (~25 minutes on the laptop on which it was tested, 
-% see 'elapsed time' below), but you may skip this and proceed to the post-processing 
-% using the output files provided. 
-%%
 tic
-for j = 1:nChains
-feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose,...
-    initialise,thinningFreq, paramSamplingFreq,stepSize,inputSeed, ...
-    delta, pp,permuteData,captureTimes,regInt,permutationFileName,...
-    5000,n0,n3,n3a,jj,kk);
-end
+%for j = 1:nChains
+%feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose,...
+  %  initialise,thinningFreq, paramSamplingFreq,stepSize,inputSeed, ...
+   % delta, pp,permuteData,captureTimes,regInt,permutationFileName,...
+  %  5000,n0,n3,n3a,jj,kk);
+%end
 toc
 
 %% Uncertainty of cell positions
@@ -106,7 +100,7 @@ toc
 % 
 % output files of the GPseudoRank algorithm.
 %%
-burnIn = 5000;%number of thinned samples to be discarded as burn-in
+burnIn = 2000;%number of thinned samples to be discarded as burn-in
 % 1:nChains refers to the identifieres of the MCMC chains and the initial
 % permutations, the output is saved in the file 'ShalekUncertA.mat'
 computePositionsPseudoRank('Shalek.csv',1:nChains,1:nChains,burnIn,...
@@ -123,11 +117,15 @@ set(0,'DefaultAxesFontName', 'Arial')
 set(0,'DefaultAxesFontSize', 10)
 set(0,'defaultfigurecolor',[1 1 1]);
 load('ShalekUncertA.mat')
-A = mean(posFreq,3);
-% computing the average mean position
-xx = mean(xx,2);
+if nChains > 1
+  A = mean(posFreq,3);
+  xx = mean(xx,2);
+else
+  A = posFreq; 
+ end
 [sorted_xx xxI] = sort(xx);
-figure()
+f = figure;
+set(f, "visible", "off")
 colormap(hot);
 imagesc(A(xxI,:)');
 xlabel('cells ordered by mean position','FontSize',12);
@@ -135,109 +133,8 @@ ylabel('position (distribution)','FontSize',12);
 set(gca,'YDir','normal')
 ax= gca;
 c=colorbar;
-%% Uncertainty of the distributions of the orders
-% The first step is to compute the L1-distances of each posterior sample of 
-% cell positions from a reference order (1:307). The reference order may be any 
-% arbitray order. The plot illustrates the uncertainty of the order of the cells.
-%%
-nSamplesThinned = floor(nSamples/thinningFreq);
-distsL1a = zeros(nChains,nSamplesThinned);
-permuts1 = zeros(nSamplesThinned,307);%307 is the total number of cells
+print("fig1", "-dpng")
 
-for j = 1:nChains
-    orders1 = csvread(sprintf('Shalek_Results_Orders_Chain%d.csv',j));
-    permStart1 = csvread(sprintf('Shalek_Permutation%d.csv',j));
-   for k = 1:nSamplesThinned
-        permuts1(k,:)  = permStart1(orders1(k,:));
-    end
-  
-    corrCap1 = corr(permuts1',captureTimes');
-    permuts1(corrCap1<0,:) = permuts1(corrCap1<0,end:-1:1);
-    distsL1a(j,:) = distFromRefOrder(permuts1,1:307);
-end
-csvwrite('ShalekDistFromRefL1Irreg.csv',distsL1a);
-%% Convergence analysis
-% First we compute the Gelman-Rubin Rhat statistic for the L1-distances of the 
-% sampled cell positions from the reference permutation 1:307.
-% 
-% Run the following code in R to compute the Gelman-Rubin statistic, using 
-% the coda package:
-% 
-% |library(coda)|
-% 
-% x1 = read.csv("ShalekDistFromRefL1Irreg.csv",header = F) 
-% 
-% x1MC = as.mcmc.list(lapply(as.data.frame(t(x1)), mcmc)) 
-% 
-% X1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
-% 
-% write.csv(X1$shrink[,,1],"GRShalek.csv")
-% 
-% We also compute the Gelman-Rubin statistic for the log-likelihoods.
-% 
-% First combine the log-likelihoods of the individual chains in a single 
-% file:
-%%
-LksShalek = [];
-for j = 1:nChains
-File = sprintf('Shalek_Results_Chain%d.csv',j);  
- xx = dlmread(File,',',[0 0 nSamplesThinned-1 0]);
- LksShalek = [LksShalek xx];
-end
-csvwrite('LksShalek.csv',LksShalek);
-%% 
-% Run the following code in R to compute the Gelman-Rubin statistic, using 
-% the coda package:
-% 
-% library(coda) 
-% 
-% x1 = read.csv("LksShalek.csv",header = F) 
-% 
-% x1MC = as.mcmc.list(lapply(as.data.frame((x1)), mcmc)) 
-% 
-% XX1 = gelman.plot(x1MC,transform = F,autoburnin = T,bin.width = 20,max.bins=497) 
-% 
-% write.table(cbind(XX1$last.iter,XX1$shrink[,1,1]),col.names = F,row.names = F,"GRShalek_Lks.csv",sep=",")
-% 
-% Now we can plot the Gelman-Rubin statistics. For convergence, a value for 
-% the statistic below 1.1 is preferable, though 1.2 is considered sufficient in
-% 
-% SP Brooks and A Gelman. General methods for monitoring convergence of iterative 
-% simulations. 
-% 
-% _J Comput Graph Stat_, 7(4): 434:455, 1998. 
-% 
-% 1.1 is recommended in 
-% 
-% A Gelman and K Shirley. Inference from simulations and monitoring convergence. 
-% In S Brooks, A Gelman, G Jones, and X-L Meng, editors, _Handbook of Markov Chain 
-% Monte Carlo_, volume 6, pages 163:174. CRC, Boca Raton, 2011. 
-%%
-A = importdata('GRWindram_Lks.csv',',');
-GRLk = A(:,2);
-stepSize = A(:,1);
-figure();
-plot(stepSize,GRLk,'LineWidth',2);
-hold on;
-h0 = refline([0,1.2]);
-h0.LineWidth = 2;
-h0.Color = 'c';
-h0.LineStyle = '--';
-h1 = refline([0,1.1]);
-h1.LineWidth = 2;
-h1.Color = 'g';
-h1.LineStyle = '--';
-h2 = refline([0,1.05]);
-h2.LineWidth = 2;
-h2.Color = 'r';
-h2.LineStyle = '--';
-ylim([1,1.7]);
-xlabel('sample(thinning = 10)','FontSize',10);
-ylabel('$\hat{R}$','Interpreter','Latex','FontSize',10);
-set(gca,'box','off');
-ax=gca;
-leg = legend([h0,h1,h2],'1.2-level','1.1-level','1.05-level');
-leg.FontSize = 11;
 
 %% Example 2: mini-cluster approximation and default parameter settings for the proposal moves
 % Simulating a data set with 5000 cells
@@ -261,7 +158,7 @@ miniclust('sim_Example1.csv',captureTimes);
 %%
 [n0,n3,n3a,jj,kk,delta,pp]  = setDefaultParams('sim_Example1KM.csv',true);
 %%
-delete -r 'sim_Example1*'
+delete 'sim_Example1*'
 %% Example 3: selecting genes
 % Simulating a data set with 5000 genes
 %%
