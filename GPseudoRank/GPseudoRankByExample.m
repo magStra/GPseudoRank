@@ -31,17 +31,17 @@
 % the convergence analysis at the end of this demonstration). 
 %%
 clear all;
-nChains = 4;% 12 for detailed convergence analysis; 1 sufficient for general 
+nChains = 3;% 12 for detailed convergence analysis; 1 sufficient for general 
 % use
 %%
 fHandle          = @pseudoRank; 
 fileName         = 'Shalek.csv';
 %%
-nSamples         = 100000;
+nSamples         = 70000;
 %% 
-% Informative priors of the model are necessary to ensure it concentrates 
-% probability mass around the correct order and to avoid that a sampling or estimation 
-% algorithm gets trapped in local modes.
+% Informative priors ensure concentration of probability mass around the 
+% correct orders and avoid that a sampling or estimation algorithm gets trapped 
+% in local modes with very short length scales or very large noise.
 %%
 priorLogSDLength = 0.01;%standard deviation of prior of log-length scale, 
 % recommended value
@@ -100,20 +100,22 @@ n0 = max(floor(307/4),1);
         kk = 1;
         jj = 1;
 %% 
-% Running nChains MCMC chains in parallel with different random starting 
-% paths. This takes a bit of time (~25 minutes on the laptop on which it was tested, 
-% see 'elapsed time' below), but you may skip this and proceed to the post-processing 
+% Running nChains MCMC chains with different random starting paths. This 
+% takes a bit of time, but you may skip this and proceed to the post-processing 
 % using the output files provided. 
+% 
+% We run several chains in this demonstration because of the convergence 
+% analysis presented later in this document. If you only want to run the method 
+% to infer the pseudotimes, then running one chain is sufficient. 
 %%
-tic
-parfor j = 1:nChains
+for j = 1:nChains%use parfor for parallel loop instead of multi-threading
+    %set nChains to 1 if you only want to run one chain
 feval(fHandle, 'Shalek.csv', j, nSamples, priorLogSDLength, verbose,...
     initialise,thinningFreq, paramSamplingFreq,stepSize,inputSeed, ...
     delta, pp,permuteData,captureTimes,regInt,permutationFileName,...
     5000,n0,n3,n3a,jj,kk);
 end
-toc
-delete(gcp('nocreate'));
+%delete(gcp('nocreate'));
 %% Uncertainty of cell positions
 % The uncertainty of the cell positions changes over the course of the response 
 % to the infection.
@@ -123,7 +125,7 @@ delete(gcp('nocreate'));
 % 
 % output files of the GPseudoRank algorithm.
 %%
-burnIn = 5000;%number of thinned samples to be discarded as burn-in
+burnIn = 2000;%number of thinned samples to be discarded as burn-in
 % 1:nChains refers to the identifieres of the MCMC chains and the initial
 % permutations, the output is saved in the file 'ShalekUncertA.mat'
 computePositionsPseudoRank('Shalek.csv',1:nChains,1:nChains,burnIn,...
@@ -152,10 +154,9 @@ ylabel('position (distribution)','FontSize',12);
 set(gca,'YDir','normal')
 ax= gca;
 c=colorbar;
-%% Uncertainty of the distributions of the orders
+%% Convergence analysis
 % The first step is to compute the L1-distances of each posterior sample of 
-% cell positions from a reference order (1:307). The reference order may be any 
-% arbitray order. The plot illustrates the uncertainty of the order of the cells.
+% cell positions from a reference order (1:307). 
 %%
 nSamplesThinned = floor(nSamples/thinningFreq);
 distsL1a = zeros(nChains,nSamplesThinned);
@@ -174,19 +175,7 @@ for j = 1:nChains
 end
 csvwrite('ShalekDistFromRefL1Irreg.csv',distsL1a);
 %% 
-% Now we illustrate the densities of the L1-distances using a histogram:
-%%
-figure();
-A = dlmread('ShalekDistFromRefL1Irreg.csv',',',...
-    [0 burnIn nChains-1 nSamplesThinned-1]);
-a = min([min(A)]);
-b = max([max(A)]);
-xlabel('$L^1$-distance','FontSize',10,'Interpreter','Latex');
-set(gcf, 'PaperUnits', 'centimeters');
-histogram(A(:),'BinEdges', a:30:b,'FaceAlpha',0.3);
-set(gca,'box','off');
-%% Convergence analysis
-% First we compute the Gelman-Rubin Rhat statistic for the L1-distances of the 
+% We compute the Gelman-Rubin Rhat statistic for the L1-distances of the 
 % sampled cell positions from the reference permutation 1:307.
 % 
 % Run the following code in R to compute the Gelman-Rubin statistic, using 
@@ -271,6 +260,7 @@ leg.FontSize = 11
 %% Example 2: mini-cluster approximation and default parameter settings for the proposal moves
 % Simulating a data set with 5000 cells
 %%
+clear all;
 logSw2 = randn(1,100)*0.1 + log(sqrt(1));
 sw2 = exp(2*logSw2);
 logL = randn(1,100).*0.1+log(0.4);
@@ -278,12 +268,14 @@ l = exp(logL);
 logSe2 = randn(1,100)*0.1 + log(sqrt(0.5));
 se2 = exp(2*logSe2);
 ppar = [logSw2;logL;logSe2];
-simGPIndiv(5000,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
+simGPIndiv(5000,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',...
+    false,'uniform');
 %% 
 % Applying the mini-cluster approximation
 %%
 %assuming there are capture times
-captureTimes = [zeros(1,1000),ones(1,1000),repmat(2,1,1000),repmat(3,1,1000),repmat(4,1,1000)];
+captureTimes = [zeros(1,1000),ones(1,1000),repmat(2,1,1000),...
+    repmat(3,1,1000),repmat(4,1,1000)];
 miniclust('sim_Example1.csv',captureTimes);
 %% 
 % Finding the default parameters for this data set:
@@ -294,6 +286,7 @@ delete -r 'sim_Example1*'
 %% Example 3: selecting genes
 % Simulating a data set with 5000 genes
 %%
+clear all;
 logSw2 = randn(1,5000)*0.1 + log(sqrt(1));
 sw2 = exp(2*logSw2);
 logL = randn(1,5000).*0.1+log(0.4);
@@ -301,7 +294,8 @@ l = exp(logL);
 logSe2 = randn(1,5000)*0.1 + log(sqrt(0.5));
 se2 = exp(2*logSe2);
 ppar = [logSw2;logL;logSe2];
-simGPIndiv(60,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',false,'uniform');
+simGPIndiv(60,sw2,l,se2,'sim_Example1.csv','tau_Example1.csv',...
+    false,'uniform');
 %% 
 % Selecting genes with capture times using anova to test difference between 
 % mean expressions for different capture times
